@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en-GB" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adder Explorer</title>
+<style>
+:root {
+  --bg: #eef3f7;
+  --paper: #ffffff;
+  --ink: #16243f;
+  --muted: #56647a;
+  --line: #cdd7e3;
+  --navy: #1c2b4a;
+  --teal: #0c7f82;
+  --teal-soft: #dcf1f1;
+  --amber: #b86e00;
+  --amber-soft: #fdf0d9;
+  --lamp: #f2a60f;
+  --red: #b3342b;
+  --red-soft: #f9e3e1;
+  --chip: #e7edf3;
+  --gate-fill: #ffffff;
+  --wire-off: #8e9aac;
+  --on-strong: #ffffff;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1726; --paper: #172236; --ink: #e5ecf5; --muted: #9eadc2; --line: #2c3b55;
+    --navy: #9fb6e0; --teal: #4fc9c9; --teal-soft: #123a3e; --amber: #f0b454; --amber-soft: #3a2b12; --lamp: #ffc23d;
+    --red: #ff8f85; --red-soft: #3b1d1c; --chip: #22314a; --gate-fill: #1d2a42; --wire-off: #5f6d85; --on-strong: #0f1726;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1726; --paper: #172236; --ink: #e5ecf5; --muted: #9eadc2; --line: #2c3b55;
+  --navy: #9fb6e0; --teal: #4fc9c9; --teal-soft: #123a3e; --amber: #f0b454; --amber-soft: #3a2b12; --lamp: #ffc23d;
+  --red: #ff8f85; --red-soft: #3b1d1c; --chip: #22314a; --gate-fill: #1d2a42; --wire-off: #5f6d85; --on-strong: #0f1726;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; font-family: var(--font-body); font-size: 17px; line-height: 1.5; color: var(--ink); background: var(--bg); }
+.wrap { max-width: 1500px; margin: 0 auto; padding: 12px 18px 40px; }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+h1 { font-size: 1.8rem; margin: 0; color: var(--navy); }
+.sub { margin: 2px 0 0; color: var(--muted); }
+h2 { font-size: 1.15rem; margin: 0 0 10px; }
+.panel { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+.btn {
+  font: inherit; font-weight: 600; cursor: pointer; border-radius: 8px; padding: 8px 14px;
+  border: 1px solid var(--line); background: var(--chip); color: var(--ink);
+}
+.btn:hover { border-color: var(--teal); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: var(--teal); border-color: var(--teal); color: var(--on-strong); }
+.btn-plain { background: transparent; }
+input[type="number"] { font: inherit; font-family: var(--font-mono); width: 5em; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.tab { border-radius: 999px; }
+.tab[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: var(--paper); }
+.grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+.stack { display: grid; gap: 14px; }
+.circuit { overflow-x: auto; }
+.circuit svg { display: block; width: 100%; height: auto; max-height: 72vh; }
+#fullCircuit svg { min-width: 540px; }
+#rippleCircuit svg { min-width: 640px; }
+.hint { color: var(--muted); font-size: 0.92rem; margin: 8px 0 0; }
+.sum-line { font-size: 1.35rem; margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--chip); }
+.sum-line b { font-family: var(--font-mono); }
+.notes p { margin: 0 0 8px; }
+.notes p:last-child { margin-bottom: 0; }
+code, .mono { font-family: var(--font-mono); }
+/* circuit drawing */
+.g-body { fill: var(--gate-fill); stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+.g-line { fill: none; stroke: var(--ink); stroke-width: 2.5; }
+.wire { fill: none; stroke-width: 3; stroke-linejoin: round; }
+.wire.on { stroke: var(--teal); stroke-width: 4.5; }
+.wire.off { stroke: var(--wire-off); }
+.wire.unknown { stroke: var(--wire-off); stroke-dasharray: 6 5; opacity: 0.7; }
+.dot.on { fill: var(--teal); }
+.dot.off, .dot.unknown { fill: var(--wire-off); }
+.switch { cursor: pointer; }
+.switch rect { fill: var(--chip); stroke: var(--ink); stroke-width: 2; }
+.switch.on rect { fill: var(--teal); }
+.switch text { font: 700 17px var(--font-mono); fill: var(--ink); pointer-events: none; }
+.switch.on text { fill: var(--on-strong); }
+.switch:hover rect { stroke: var(--amber); stroke-width: 3; }
+.lamp circle { stroke: var(--ink); stroke-width: 2; fill: var(--chip); }
+.lamp.on circle { fill: var(--lamp); }
+.lamp.unknown circle { fill: transparent; stroke-dasharray: 4 3; stroke: var(--muted); }
+.lamp .val { font: 700 16px var(--font-mono); fill: var(--ink); }
+.lamp.on .val { fill: #2a1a00; }
+.label { font: 700 17px var(--font-mono); fill: var(--ink); }
+.point { font: 700 16px var(--font-mono); fill: var(--teal); }
+.small { font: 600 12px var(--font-mono); fill: var(--muted); }
+.block rect { fill: var(--gate-fill); stroke: var(--ink); stroke-width: 2.5; }
+.block.current rect { stroke: var(--amber); stroke-width: 4; fill: var(--amber-soft); }
+.block text { font: 700 22px var(--font-mono); fill: var(--ink); }
+.block .small { font: 600 12px var(--font-mono); fill: var(--muted); }
+/* tables */
+.tt { border-collapse: collapse; width: 100%; font-family: var(--font-mono); font-size: 1.05rem; }
+.tt th, .tt td { text-align: center; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.tt th { color: var(--navy); }
+.tt .split { border-left: 3px solid var(--navy); }
+.tt .pt { color: var(--teal); }
+.tt tbody tr { cursor: pointer; }
+.tt tbody tr:hover { background: var(--chip); }
+.tt tr.current { background: var(--teal-soft); }
+/* ripple */
+.inputs { display: flex; gap: 10px 18px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.inputs label { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.column-sum { border-collapse: collapse; font-family: var(--font-mono); font-size: 1.6rem; margin: 4px 0 0; }
+.column-sum th { font-family: var(--font-body); font-size: 0.8rem; color: var(--muted); font-weight: 600; padding: 0 8px; }
+.column-sum td { text-align: center; width: 2.2em; height: 1.9em; padding: 0 2px; }
+.column-sum td.rowname { text-align: right; width: auto; padding-right: 12px; font-family: var(--font-body); font-size: 0.9rem; color: var(--muted); }
+.column-sum tr.carry td { font-size: 1rem; color: var(--amber); }
+.column-sum tr.sum td { border-top: 3px solid var(--ink); font-weight: 700; }
+.column-sum td.cur { background: var(--amber-soft); }
+.column-sum td.unk { color: var(--muted); opacity: 0.6; }
+.column-sum td.over { color: var(--red); }
+.explain { margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--chip); min-height: 3em; }
+.warn { margin: 10px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--red-soft); border-left: 5px solid var(--red); }
+.good { margin: 10px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--teal-soft); border-left: 5px solid var(--teal); }
+.feedback { margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; border-left: 5px solid; }
+.feedback p { margin: 0 0 6px; }
+.feedback p:last-child { margin-bottom: 0; }
+.fb-good { background: var(--teal-soft); border-color: var(--teal); }
+.fb-bad { background: var(--red-soft); border-color: var(--red); }
+.fb-warn { background: var(--amber-soft); border-color: var(--amber); }
+.cell {
+  font: 700 1.3rem var(--font-mono); width: 1.9em; height: 1.7em; cursor: pointer; color: var(--ink);
+  border: 2px dashed var(--muted); border-radius: 8px; background: var(--paper);
+}
+.carry .cell { font-size: 1rem; width: 2em; height: 1.8em; color: var(--amber); }
+.cell.filled { border-style: solid; background: var(--chip); }
+.cell.right { border-color: var(--teal); background: var(--teal-soft); }
+.cell.wrong { border-color: var(--red); background: var(--red-soft); }
+.fixed { color: var(--muted); }
+.tally b { font-family: var(--font-mono); color: var(--teal); font-size: 1.2rem; }
+.theme .t-label { margin-left: 4px; }
+.phone-only { display: none; }
+@media (max-width: 700px) {
+  body { font-size: 16px; }
+  .wrap { padding: 8px 10px 30px; }
+  h1 { font-size: 1.35rem; }
+  .sub { display: none; }
+  .theme .t-label { display: none; }
+  .phone-only { display: inline; }
+  .panel { padding: 12px; }
+  .tab { padding: 6px 10px; font-size: 0.9rem; }
+  .sum-line { font-size: 1.1rem; }
+  .column-sum { font-size: 1.3rem; }
+  .cell { font-size: 1.1rem; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Adder explorer</h1>
+      <p class="sub">See how logic gates add binary numbers: from a half adder to a 4-bit adder.</p>
+    </div>
+    <button id="themeToggle" class="btn btn-plain theme" type="button"><span class="t-icon" aria-hidden="true"></span><span class="t-label"></span></button>
+  </header>
+
+  <div class="tabs" role="group" aria-label="Section">
+    <button class="btn tab" type="button" data-tab="half">Half adder</button>
+    <button class="btn tab" type="button" data-tab="full">Full adder</button>
+    <button class="btn tab" type="button" data-tab="ripple">4-bit adder</button>
+    <button class="btn tab" type="button" data-tab="practise">Practise</button>
+  </div>
+
+  <!-- Half adder -->
+  <section id="tab-half" class="grid">
+    <div class="panel">
+      <h2>Half adder: adds two bits</h2>
+      <div class="circuit" id="halfCircuit"></div>
+      <p class="hint">Select A or B to switch it between 0 and 1.</p>
+      <p class="sum-line" id="halfSum" aria-live="polite"></p>
+    </div>
+    <div class="stack">
+      <div class="panel">
+        <h2>Truth table</h2>
+        <table class="tt" id="halfTable"></table>
+        <p class="hint">Select a row to set the inputs.</p>
+      </div>
+      <div class="panel notes">
+        <h2>How it works</h2>
+        <p>The sum bit is <code>S = A ⊻ B</code>. It is 1 when exactly one input is 1.</p>
+        <p>The carry bit is <code>C = A ∧ B</code>. It is 1 only when both inputs are 1, because 1 + 1 = 10 in binary.</p>
+        <p>It's called a <em>half</em> adder because it can't accept a carry from a previous column, so it can only add the rightmost bits of two numbers.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Full adder -->
+  <section id="tab-full" class="grid" hidden>
+    <div class="panel">
+      <h2>Full adder: adds two bits and a carry in</h2>
+      <div class="circuit" id="fullCircuit"></div>
+      <p class="hint">Select A, B or Cin to switch it. X, Y and Z label the outputs of the gates they are next to.</p>
+      <p class="sum-line" id="fullSum" aria-live="polite"></p>
+    </div>
+    <div class="stack">
+      <div class="panel">
+        <h2>Truth table</h2>
+        <div style="overflow-x:auto"><table class="tt" id="fullTable"></table></div>
+        <p class="hint">Select a row to set the inputs.</p>
+      </div>
+      <div class="panel notes">
+        <h2>How it works</h2>
+        <p>A full adder is two half adders and an OR gate. The first half adder adds A and B, giving <code>X = A ⊻ B</code> and <code>Z = A ∧ B</code>.</p>
+        <p>The second half adder adds X to the carry in: <code>S = X ⊻ Cin</code>, with carry <code>Y = X ∧ Cin</code>.</p>
+        <p>If either half adder produces a carry, there is a carry out: <code>Cout = Y ∨ Z</code>.</p>
+        <p>Because it accepts a carry in, a full adder can add any column of a binary number.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Ripple carry adder -->
+  <section id="tab-ripple" hidden>
+    <div class="panel">
+      <h2>4-bit ripple-carry adder</h2>
+      <div class="inputs">
+        <label>A = <input type="number" id="numA" min="0" max="15" value="6"> <span class="mono" id="binA"></span></label>
+        <label>B = <input type="number" id="numB" min="0" max="15" value="7"> <span class="mono" id="binB"></span></label>
+        <button class="btn" type="button" id="randomPair">Random numbers</button>
+      </div>
+      <div class="circuit" id="rippleCircuit"></div>
+      <p class="hint"><span class="phone-only">Swipe the diagram sideways to see every adder. </span>Each FA box is a full adder. Select any bit of A or B to flip it. The carry out of each adder feeds the carry in of the next one to its left.</p>
+      <div class="controls">
+        <button class="btn" type="button" id="stepReset">⏮ Start again</button>
+        <button class="btn btn-primary" type="button" id="stepNext">Next bit ▶</button>
+        <button class="btn" type="button" id="stepPlay">▶ Play</button>
+        <button class="btn" type="button" id="stepAll">Show all ⏭</button>
+      </div>
+      <div class="grid" style="margin-top:12px">
+        <div>
+          <table class="column-sum" id="rippleColumns" aria-label="Column addition"></table>
+        </div>
+        <div>
+          <p class="explain" id="rippleExplain" aria-live="polite"></p>
+          <div id="rippleResult"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Practise -->
+  <section id="tab-practise" hidden>
+    <div class="panel">
+      <h2>Practise: add like a ripple-carry adder</h2>
+      <p>Add the two 4-bit numbers. Work from the right: fill in each sum bit, then the carry into the next column. Select a box to cycle through blank, 0 and 1, or select it and type 0 or 1.</p>
+      <div class="inputs">
+        <label><input type="checkbox" id="allowOverflow" checked> Include sums that overflow</label>
+        <button class="btn" type="button" id="newPractise">New question</button>
+        <span class="tally" aria-live="polite">Right first time: <b id="tallyRight">0</b> of <b id="tallyTotal">0</b></span>
+      </div>
+      <table class="column-sum" id="practiseTable" aria-label="Column addition to complete"></table>
+      <div class="controls">
+        <button class="btn btn-primary" type="button" id="practiseCheck">Check</button>
+        <button class="btn" type="button" id="practiseReveal">Show answer</button>
+      </div>
+      <div id="practiseFeedback" aria-live="polite"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const state = {
+    tab: 'half',
+    half: { A: 0, B: 0 },
+    full: { A: 1, B: 1, Cin: 0 },
+    ripple: { a: 6, b: 7, step: 4, timer: null },
+    practise: null,
+    right: 0,
+    total: 0
+  };
+
+  /* ---------- Helpers ---------- */
+
+  function bit(n, i) {
+    return (n >> i) & 1;
+  }
+
+  function toBinary(n, width) {
+    let s = n.toString(2);
+    while (s.length < width) { s = '0' + s; }
+    return s;
+  }
+
+  function cls(v) {
+    if (v === 1) { return 'on'; }
+    if (v === 0) { return 'off'; }
+    return 'unknown';
+  }
+
+  function show(v) {
+    return v === null || v === undefined ? '?' : String(v);
+  }
+
+  function randomInt(min, max) {
+    return min + Math.floor(Math.random() * (max - min + 1));
+  }
+
+  /* ---------- Drawing pieces ---------- */
+
+  function gate(type, x, y) {
+    let s = '<g transform="translate(' + x + ',' + y + ')">';
+    if (type === 'AND') {
+      s += '<path class="g-body" d="M10 0 H40 A30 30 0 0 1 40 60 H10 Z"></path><path class="g-line" d="M0 15 H10 M0 45 H10 M70 30 H80"></path>';
+    } else if (type === 'OR') {
+      s += '<path class="g-body" d="M8 0 Q28 30 8 60 Q48 60 70 30 Q48 0 8 0 Z"></path><path class="g-line" d="M0 15 H15 M0 45 H15 M70 30 H80"></path>';
+    } else {
+      s += '<path class="g-body" d="M14 0 Q34 30 14 60 Q54 60 72 30 Q54 0 14 0 Z"></path><path class="g-line" d="M4 0 Q24 30 4 60 M0 15 H11 M0 45 H11 M72 30 H80"></path>';
+    }
+    return s + '</g>';
+  }
+
+  function wire(d, v) {
+    return '<path class="wire ' + cls(v) + '" d="' + d + '"></path>';
+  }
+
+  function dot(x, y, v) {
+    return '<circle class="dot ' + cls(v) + '" cx="' + x + '" cy="' + y + '" r="5"></circle>';
+  }
+
+  function switchSvg(x, y, width, name, v, key) {
+    return '<g class="switch' + (v ? ' on' : '') + '" data-toggle="' + key + '" tabindex="0" role="button" aria-label="Input ' + name + ' is ' + v + '. Select to change it.">' +
+      '<rect x="' + x + '" y="' + (y - 16) + '" width="' + width + '" height="32" rx="8"></rect>' +
+      '<text x="' + (x + 9) + '" y="' + y + '" dominant-baseline="central">' + name + '</text>' +
+      '<text x="' + (x + width - 9) + '" y="' + y + '" text-anchor="end" dominant-baseline="central">' + v + '</text></g>';
+  }
+
+  function chipSvg(cx, cy, v, key, name) {
+    return '<g class="switch' + (v ? ' on' : '') + '" data-toggle="' + key + '" tabindex="0" role="button" aria-label="' + name + ' is ' + v + '. Select to change it.">' +
+      '<rect x="' + (cx - 18) + '" y="' + (cy - 15) + '" width="36" height="30" rx="7"></rect>' +
+      '<text x="' + cx + '" y="' + cy + '" text-anchor="middle" dominant-baseline="central">' + v + '</text></g>';
+  }
+
+  function lamp(cx, cy, r, name, v, labelX, labelY) {
+    let s = '<g class="lamp ' + cls(v) + '"><circle cx="' + cx + '" cy="' + cy + '" r="' + r + '"></circle>' +
+      '<text class="val" x="' + cx + '" y="' + cy + '" text-anchor="middle" dominant-baseline="central">' + show(v) + '</text></g>';
+    if (name) {
+      s += '<text class="label" x="' + labelX + '" y="' + labelY + '" dominant-baseline="central">' + name + '</text>';
+    }
+    return s;
+  }
+
+  function truthTable(inputs, outputs, rows, currentRow) {
+    let html = '<thead><tr>';
+    inputs.forEach(function (name) { html += '<th scope="col">' + name + '</th>'; });
+    outputs.forEach(function (o, i) {
+      html += '<th scope="col" class="' + (i === 0 ? 'split ' : '') + (o.point ? 'pt' : '') + '">' + o.name + '</th>';
+    });
+    html += '</tr></thead><tbody>';
+    rows.forEach(function (row, m) {
+      html += '<tr data-row="' + m + '" tabindex="0"' + (m === currentRow ? ' class="current"' : '') + '>';
+      row.inputs.forEach(function (v) { html += '<td>' + v + '</td>'; });
+      row.outputs.forEach(function (v, i) {
+        html += '<td class="' + (i === 0 ? 'split ' : '') + (outputs[i].point ? 'pt' : '') + '">' + v + '</td>';
+      });
+      html += '</tr>';
+    });
+    return html + '</tbody>';
+  }
+
+  /* ---------- Half adder ---------- */
+
+  function renderHalf() {
+    const A = state.half.A;
+    const B = state.half.B;
+    const S = A ^ B;
+    const C = A & B;
+    let s = '<svg viewBox="0 0 430 250" role="img" aria-label="Half adder circuit">';
+    s += wire('M64 45 H80 V65 H200', A) + wire('M110 65 V185 H200', A) + dot(110, 65, A);
+    s += wire('M64 115 H80 V95 H200', B) + wire('M150 95 V215 H200', B) + dot(150, 95, B);
+    s += gate('AND', 200, 50) + gate('XOR', 200, 170);
+    s += wire('M280 80 H340', C) + wire('M280 200 H340', S);
+    s += switchSvg(4, 45, 60, 'A', A, 'half.A') + switchSvg(4, 115, 60, 'B', B, 'half.B');
+    s += lamp(360, 80, 20, 'C', C, 390, 80) + lamp(360, 200, 20, 'S', S, 390, 200);
+    s += '</svg>';
+    document.getElementById('halfCircuit').innerHTML = s;
+    document.getElementById('halfSum').innerHTML = A + ' + ' + B + ' = ' + (A + B) + ' in denary = <b>' + C + S + '</b> in binary, so <b>C = ' + C + '</b> and <b>S = ' + S + '</b>';
+    const rows = [];
+    for (let m = 0; m < 4; m++) {
+      const a = bit(m, 1);
+      const b = bit(m, 0);
+      rows.push({ inputs: [a, b], outputs: [a & b, a ^ b] });
+    }
+    document.getElementById('halfTable').innerHTML = truthTable(['A', 'B'], [{ name: 'C' }, { name: 'S' }], rows, A * 2 + B);
+  }
+
+  /* ---------- Full adder ---------- */
+
+  function fullValues(A, B, Cin) {
+    const X = A ^ B;
+    const Y = X & Cin;
+    const Z = A & B;
+    return { X: X, Y: Y, Z: Z, S: X ^ Cin, Cout: Y | Z };
+  }
+
+  function renderFull() {
+    const A = state.full.A;
+    const B = state.full.B;
+    const Cin = state.full.Cin;
+    const v = fullValues(A, B, Cin);
+    let s = '<svg viewBox="0 0 700 300" role="img" aria-label="Full adder circuit">';
+    s += wire('M70 45 H92 V55 H180', A) + wire('M150 55 V205 H180', A) + dot(150, 55, A);
+    s += wire('M70 105 H118 V85 H180', B) + wire('M130 85 V235 H180', B) + dot(130, 85, B);
+    s += wire('M70 165 H300 V125 H360', Cin) + wire('M300 165 V250 H360', Cin) + dot(300, 165, Cin);
+    s += wire('M260 220 H360', v.X) + wire('M340 220 V95 H360', v.X) + dot(340, 220, v.X);
+    s += wire('M260 70 H310 V35 H500', v.Z) + wire('M440 110 H470 V65 H500', v.Y);
+    s += wire('M580 50 H600', v.Cout) + wire('M440 235 H600', v.S);
+    s += gate('AND', 180, 40) + gate('XOR', 180, 190) + gate('AND', 360, 80) + gate('XOR', 360, 205) + gate('OR', 500, 20);
+    s += '<text class="point" x="268" y="52">Z</text><text class="point" x="448" y="92">Y</text><text class="point" x="268" y="202">X</text>';
+    s += switchSvg(4, 45, 66, 'A', A, 'full.A') + switchSvg(4, 105, 66, 'B', B, 'full.B') + switchSvg(4, 165, 66, 'Cin', Cin, 'full.Cin');
+    s += lamp(620, 50, 20, 'Cout', v.Cout, 648, 50) + lamp(620, 235, 20, 'S', v.S, 648, 235);
+    s += '</svg>';
+    document.getElementById('fullCircuit').innerHTML = s;
+    const total = A + B + Cin;
+    document.getElementById('fullSum').innerHTML = A + ' + ' + B + ' + ' + Cin + ' = ' + total + ' in denary = <b>' + v.Cout + v.S + '</b> in binary, so <b>Cout = ' + v.Cout + '</b> and <b>S = ' + v.S + '</b>';
+    const rows = [];
+    for (let m = 0; m < 8; m++) {
+      const a = bit(m, 2);
+      const b = bit(m, 1);
+      const c = bit(m, 0);
+      const r = fullValues(a, b, c);
+      rows.push({ inputs: [a, b, c], outputs: [r.X, r.Y, r.Z, r.Cout, r.S] });
+    }
+    document.getElementById('fullTable').innerHTML = truthTable(['A', 'B', 'Cin'],
+      [{ name: 'X', point: true }, { name: 'Y', point: true }, { name: 'Z', point: true }, { name: 'Cout' }, { name: 'S' }],
+      rows, A * 4 + B * 2 + Cin);
+  }
+
+  /* ---------- Ripple-carry adder ---------- */
+
+  // carries[i] is the carry into bit i; carries[4] is the final carry out.
+  function rippleValues(a, b) {
+    const carries = [0];
+    const sums = [];
+    for (let i = 0; i < 4; i++) {
+      const total = bit(a, i) + bit(b, i) + carries[i];
+      sums.push(total & 1);
+      carries.push(total >> 1);
+    }
+    return { sums: sums, carries: carries };
+  }
+
+  function blockX(i) {
+    return 590 - i * 165;
+  }
+
+  function renderRipple() {
+    const r = state.ripple;
+    const vals = rippleValues(r.a, r.b);
+    const known = function (i) { return r.step >= 4 || i < r.step; };
+    const current = r.step < 4 ? r.step - 1 : -1;
+    let s = '<svg viewBox="0 0 770 280" role="img" aria-label="Four full adders joined in a chain">';
+    s += '<text class="label" x="6" y="30" dominant-baseline="central">A</text>';
+    s += '<text class="label" x="6" y="64" dominant-baseline="central">B</text>';
+    for (let i = 0; i < 4; i++) {
+      const x = blockX(i);
+      const ai = bit(r.a, i);
+      const bi = bit(r.b, i);
+      const sum = known(i) ? vals.sums[i] : null;
+      const carryOut = known(i) ? vals.carries[i + 1] : null;
+      s += wire('M' + (x + 30) + ' 44 V100', ai) + wire('M' + (x + 80) + ' 78 V100', bi);
+      s += wire('M' + (x + 55) + ' 180 V212', sum);
+      if (i === 0) {
+        s += wire('M' + (x + 110) + ' 140 H' + (x + 138), 0);
+        s += '<text class="label" x="' + (x + 144) + '" y="140" dominant-baseline="central">0</text>';
+      }
+      if (i < 3) {
+        s += wire('M' + x + ' 140 H' + (x - 55), carryOut);
+        s += '<text class="small" x="' + (x - 27) + '" y="128" text-anchor="middle">c' + (i + 1) + ' = ' + show(carryOut) + '</text>';
+      } else {
+        s += wire('M' + x + ' 140 H54', carryOut);
+      }
+      s += '<g class="block' + (i === current ? ' current' : '') + '"><rect x="' + x + '" y="100" width="110" height="80" rx="8"></rect>' +
+        '<text x="' + (x + 55) + '" y="140" text-anchor="middle" dominant-baseline="central">FA</text>' +
+        '<text class="small" x="' + (x + 55) + '" y="164" text-anchor="middle">bit ' + i + '</text>' +
+        '<text class="small" x="' + (x + 104) + '" y="116" text-anchor="end">Cin</text>' +
+        '<text class="small" x="' + (x + 6) + '" y="116">Cout</text></g>';
+      s += chipSvg(x + 30, 30, ai, 'ripple.a.' + i, 'A' + i);
+      s += chipSvg(x + 80, 64, bi, 'ripple.b.' + i, 'B' + i);
+      s += lamp(x + 55, 230, 17, '', sum);
+      s += '<text class="small" x="' + (x + 55) + '" y="266" text-anchor="middle">S' + i + '</text>';
+    }
+    const final = r.step >= 4 ? vals.carries[4] : null;
+    s += lamp(36, 140, 17, '', final);
+    s += '<text class="small" x="36" y="176" text-anchor="middle">carry</text><text class="small" x="36" y="190" text-anchor="middle">out</text>';
+    s += '</svg>';
+    const box = document.getElementById('rippleCircuit');
+    box.innerHTML = s;
+    if (box.scrollWidth > box.clientWidth + 4) {
+      const focusBit = r.step >= 4 ? 3 : Math.max(r.step - 1, 0);
+      const scale = box.scrollWidth / 770;
+      box.scrollLeft = (blockX(focusBit) + 55) * scale - box.clientWidth / 2;
+    }
+    document.getElementById('binA').textContent = toBinary(r.a, 4);
+    document.getElementById('binB').textContent = toBinary(r.b, 4);
+    document.getElementById('numA').value = r.a;
+    document.getElementById('numB').value = r.b;
+    renderColumns(vals, known, current);
+    renderRippleText(vals);
+    document.getElementById('stepNext').disabled = r.step >= 4;
+  }
+
+  function renderColumns(vals, known, current) {
+    const r = state.ripple;
+    function td(content, i, extra) {
+      return '<td class="' + (i === current ? 'cur ' : '') + (extra || '') + '">' + content + '</td>';
+    }
+    let html = '<thead><tr><th></th><th>overflow</th><th>bit 3</th><th>bit 2</th><th>bit 1</th><th>bit 0</th></tr></thead><tbody>';
+    html += '<tr class="carry"><td class="rowname">carry in</td>';
+    html += td(r.step >= 4 ? String(vals.carries[4]) : '?', -1, r.step >= 4 ? '' : 'unk');
+    for (let i = 3; i >= 0; i--) {
+      const k = i === 0 || known(i - 1);
+      html += td(k ? String(vals.carries[i]) : '?', i, k ? '' : 'unk');
+    }
+    html += '</tr><tr><td class="rowname">A</td><td></td>';
+    for (let i = 3; i >= 0; i--) { html += td(bit(r.a, i), i); }
+    html += '</tr><tr><td class="rowname">B</td><td>+</td>';
+    for (let i = 3; i >= 0; i--) { html += td(bit(r.b, i), i); }
+    html += '</tr><tr class="sum"><td class="rowname">sum</td>';
+    html += td(r.step >= 4 ? String(vals.carries[4]) : '?', -1, r.step >= 4 ? (vals.carries[4] ? 'over' : '') : 'unk');
+    for (let i = 3; i >= 0; i--) {
+      html += td(known(i) ? String(vals.sums[i]) : '?', i, known(i) ? '' : 'unk');
+    }
+    html += '</tr></tbody>';
+    document.getElementById('rippleColumns').innerHTML = html;
+  }
+
+  function describeBit(i, vals) {
+    const r = state.ripple;
+    const a = bit(r.a, i);
+    const b = bit(r.b, i);
+    const c = vals.carries[i];
+    const total = a + b + c;
+    return '<strong>Bit ' + i + ':</strong> A' + i + ' + B' + i + ' + carry in = ' + a + ' + ' + b + ' + ' + c + ' = ' + total +
+      ', which is <b class="mono">' + (total >> 1) + (total & 1) + '</b> in binary. So S' + i + ' = ' + (total & 1) +
+      (i < 3 ? ' and the carry into bit ' + (i + 1) + ' is ' + (total >> 1) + '.' : ' and the final carry out is ' + (total >> 1) + '.');
+  }
+
+  function renderRippleText(vals) {
+    const r = state.ripple;
+    const explain = document.getElementById('rippleExplain');
+    const result = document.getElementById('rippleResult');
+    if (r.step === 0) {
+      explain.innerHTML = 'Adding starts at the right. Select <b>Next bit</b> to add bit 0. The adders further left can\'t finish until the carry reaches them.';
+      result.innerHTML = '';
+      return;
+    }
+    if (r.step < 4) {
+      explain.innerHTML = describeBit(r.step - 1, vals);
+      result.innerHTML = '';
+      return;
+    }
+    let lines = [];
+    for (let i = 0; i < 4; i++) { lines.push(describeBit(i, vals)); }
+    explain.innerHTML = lines.join('<br>');
+    const total = r.a + r.b;
+    const stored = total & 15;
+    let html;
+    if (vals.carries[4]) {
+      html = '<div class="warn"><strong>Overflow!</strong> ' + r.a + ' + ' + r.b + ' = ' + total + ', which needs 5 bits (<span class="mono">' +
+        toBinary(total, 5) + '</span>). A 4-bit result can only hold <span class="mono">' + toBinary(stored, 4) + '</span> = ' + stored +
+        ', so the carry out of bit 3 shows that the answer is too big.</div>';
+    } else {
+      html = '<div class="good"><strong>Result:</strong> <span class="mono">' + toBinary(r.a, 4) + ' + ' + toBinary(r.b, 4) + ' = ' +
+        toBinary(stored, 4) + '</span>, which is ' + r.a + ' + ' + r.b + ' = ' + total + ' in denary.</div>';
+    }
+    result.innerHTML = html + '<p class="hint">Each adder has to wait for the carry from the one on its right. With more bits, the delays add up, which is why this design is slow for large numbers.</p>';
+  }
+
+  function stopPlay() {
+    if (state.ripple.timer) {
+      clearInterval(state.ripple.timer);
+      state.ripple.timer = null;
+      document.getElementById('stepPlay').textContent = '▶ Play';
+    }
+  }
+
+  function playRipple() {
+    const r = state.ripple;
+    if (r.timer) { stopPlay(); return; }
+    r.step = 0;
+    renderRipple();
+    document.getElementById('stepPlay').textContent = '⏸ Pause';
+    r.timer = setInterval(function () {
+      if (r.step >= 4) { stopPlay(); return; }
+      r.step++;
+      renderRipple();
+    }, 1500);
+  }
+
+  function setNumber(which, value) {
+    const n = Math.max(0, Math.min(15, parseInt(value, 10) || 0));
+    stopPlay();
+    state.ripple[which] = n;
+    state.ripple.step = 4;
+    renderRipple();
+  }
+
+  /* ---------- Practise ---------- */
+
+  function newPractise() {
+    const allow = document.getElementById('allowOverflow').checked;
+    let a;
+    let b;
+    let tries = 0;
+    do {
+      a = randomInt(1, 15);
+      b = randomInt(1, 15);
+      tries++;
+    } while (tries < 100 && ((!allow && a + b > 15) || rippleValues(a, b).carries.slice(1).every(function (c) { return c === 0; })));
+    state.practise = {
+      a: a, b: b, vals: rippleValues(a, b),
+      carry: ['', '', '', '', ''],
+      sum: ['', '', '', ''],
+      marks: null, done: false, counted: false, firstTry: true, feedback: null
+    };
+    renderPractise();
+  }
+
+  function practiseCell(kind, i) {
+    const p = state.practise;
+    const value = p[kind][i];
+    const mark = p.marks ? p.marks[kind][i] : '';
+    return '<td><button class="cell' + (value !== '' ? ' filled' : '') + (mark ? ' ' + mark : '') + '" type="button" data-cell="' + kind + ',' + i + '"' +
+      ' aria-label="' + (kind === 'sum' ? 'sum bit ' + i : (i === 4 ? 'overflow carry' : 'carry into bit ' + i)) + '"' + (p.done ? ' disabled' : '') + '>' + value + '</button></td>';
+  }
+
+  function renderPractise() {
+    const p = state.practise;
+    let html = '<thead><tr><th></th><th>overflow</th><th>bit 3</th><th>bit 2</th><th>bit 1</th><th>bit 0</th></tr></thead><tbody>';
+    html += '<tr class="carry"><td class="rowname">carry in</td>' + practiseCell('carry', 4);
+    for (let i = 3; i >= 1; i--) { html += practiseCell('carry', i); }
+    html += '<td class="fixed">0</td></tr>';
+    html += '<tr><td class="rowname">A = ' + p.a + '</td><td></td>';
+    for (let i = 3; i >= 0; i--) { html += '<td>' + bit(p.a, i) + '</td>'; }
+    html += '</tr><tr><td class="rowname">B = ' + p.b + '</td><td>+</td>';
+    for (let i = 3; i >= 0; i--) { html += '<td>' + bit(p.b, i) + '</td>'; }
+    html += '</tr><tr class="sum"><td class="rowname">sum</td><td></td>';
+    for (let i = 3; i >= 0; i--) { html += practiseCell('sum', i); }
+    html += '</tr></tbody>';
+    document.getElementById('practiseTable').innerHTML = html;
+    document.getElementById('practiseFeedback').innerHTML = p.feedback ?
+      '<div class="feedback fb-' + p.feedback.kind + '">' + p.feedback.html + '</div>' : '';
+    document.getElementById('practiseCheck').disabled = p.done;
+    document.getElementById('practiseReveal').disabled = p.done;
+  }
+
+  function countResult(correct) {
+    const p = state.practise;
+    if (p.counted) { return; }
+    p.counted = true;
+    state.total++;
+    if (correct) { state.right++; }
+    document.getElementById('tallyRight').textContent = state.right;
+    document.getElementById('tallyTotal').textContent = state.total;
+  }
+
+  function checkPractise() {
+    const p = state.practise;
+    const marks = { carry: ['', '', '', '', ''], sum: ['', '', '', ''] };
+    let blanks = 0;
+    let firstWrong = -1;
+    for (let i = 0; i < 4; i++) {
+      const entries = [['sum', i, p.vals.sums[i]], ['carry', i + 1, p.vals.carries[i + 1]]];
+      entries.forEach(function (e) {
+        const entry = p[e[0]][e[1]];
+        if (entry === '') { blanks++; return; }
+        if (Number(entry) === e[2]) {
+          marks[e[0]][e[1]] = 'right';
+        } else {
+          marks[e[0]][e[1]] = 'wrong';
+          if (firstWrong === -1) { firstWrong = i; }
+        }
+      });
+    }
+    p.marks = marks;
+    if (firstWrong !== -1) {
+      countResult(false);
+      p.firstTry = false;
+      const a = bit(p.a, firstWrong);
+      const b = bit(p.b, firstWrong);
+      const c = p.vals.carries[firstWrong];
+      const t = a + b + c;
+      p.feedback = {
+        kind: 'bad',
+        html: '<p><strong>Not quite.</strong> Look at bit ' + firstWrong + ': ' + a + ' + ' + b + ' + carry in ' + c + ' = ' + t +
+          ', which is ' + (t >> 1) + (t & 1) + ' in binary. Write the right-hand digit in the sum row and carry the left-hand digit into the next column.</p>'
+      };
+    } else if (blanks > 0) {
+      p.feedback = { kind: 'warn', html: '<p>So far so good. ' + blanks + ' box' + (blanks === 1 ? ' is' : 'es are') + ' still empty. Remember to fill in the carry into each column, even when it is 0.</p>' };
+    } else {
+      countResult(p.firstTry);
+      p.done = true;
+      const total = p.a + p.b;
+      let html = '<p><strong>Correct!</strong> ' + toBinary(p.a, 4) + ' + ' + toBinary(p.b, 4) + ' = ' + toBinary(total & 15, 4) +
+        (p.vals.carries[4] ? ' with a carry out of 1.' : '.') + '</p>';
+      html += p.vals.carries[4] ?
+        '<p>The carry out of bit 3 means an overflow: ' + p.a + ' + ' + p.b + ' = ' + total + ', which doesn\'t fit in 4 bits.</p>' :
+        '<p>Check in denary: ' + p.a + ' + ' + p.b + ' = ' + total + '.</p>';
+      html += '<p><button class="btn btn-primary" type="button" data-action="next">Next question</button></p>';
+      p.feedback = { kind: 'good', html: html };
+    }
+    renderPractise();
+  }
+
+  function revealPractise() {
+    const p = state.practise;
+    countResult(false);
+    p.done = true;
+    p.marks = null;
+    for (let i = 0; i < 4; i++) {
+      p.sum[i] = String(p.vals.sums[i]);
+      p.carry[i + 1] = String(p.vals.carries[i + 1]);
+    }
+    p.feedback = {
+      kind: 'warn',
+      html: '<p>' + p.a + ' + ' + p.b + ' = ' + (p.a + p.b) + (p.vals.carries[4] ? ', which overflows 4 bits.' : '.') +
+        ' Open the 4-bit adder tab to watch this sum step by step.</p><p><button class="btn btn-primary" type="button" data-action="next">Next question</button></p>'
+    };
+    state.ripple.a = p.a;
+    state.ripple.b = p.b;
+    state.ripple.step = 0;
+    renderRipple();
+    renderPractise();
+  }
+
+  function setPractiseCell(kind, i, value) {
+    const p = state.practise;
+    if (p.done) { return; }
+    p[kind][i] = value;
+    if (p.marks) { p.marks[kind][i] = ''; }
+    renderPractise();
+    const again = document.querySelector('[data-cell="' + kind + ',' + i + '"]');
+    if (again) { again.focus(); }
+  }
+
+  /* ---------- Events ---------- */
+
+  function toggle(key) {
+    const parts = key.split('.');
+    if (parts[0] === 'half') {
+      state.half[parts[1]] = 1 - state.half[parts[1]];
+      renderHalf();
+    } else if (parts[0] === 'full') {
+      state.full[parts[1]] = 1 - state.full[parts[1]];
+      renderFull();
+    } else {
+      stopPlay();
+      state.ripple[parts[1]] = state.ripple[parts[1]] ^ (1 << Number(parts[2]));
+      state.ripple.step = 4;
+      renderRipple();
+    }
+  }
+
+  function setupCircuitEvents(id) {
+    const box = document.getElementById(id);
+    box.addEventListener('click', function (event) {
+      const sw = event.target.closest('[data-toggle]');
+      if (sw) { toggle(sw.getAttribute('data-toggle')); }
+    });
+    box.addEventListener('keydown', function (event) {
+      const sw = event.target.closest('[data-toggle]');
+      if (sw && (event.key === 'Enter' || event.key === ' ')) {
+        event.preventDefault();
+        const key = sw.getAttribute('data-toggle');
+        toggle(key);
+        const again = box.querySelector('[data-toggle="' + key + '"]');
+        if (again) { again.focus(); }
+      }
+    });
+  }
+
+  function setupTableEvents(id, apply) {
+    const table = document.getElementById(id);
+    function choose(event) {
+      const row = event.target.closest('[data-row]');
+      if (row) { apply(parseInt(row.getAttribute('data-row'), 10)); }
+    }
+    table.addEventListener('click', choose);
+    table.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        choose(event);
+      }
+    });
+  }
+
+  function setTab(tab) {
+    state.tab = tab;
+    stopPlay();
+    ['half', 'full', 'ripple', 'practise'].forEach(function (name) {
+      document.getElementById('tab-' + name).hidden = name !== tab;
+    });
+    const tabs = document.querySelectorAll('[data-tab]');
+    for (let i = 0; i < tabs.length; i++) {
+      tabs[i].setAttribute('aria-pressed', tabs[i].getAttribute('data-tab') === tab ? 'true' : 'false');
+    }
+  }
+
+  function setupThemeToggle() {
+    const button = document.getElementById('themeToggle');
+    const root = document.documentElement;
+    function label() {
+      const dark = root.getAttribute('data-theme') === 'dark';
+      button.querySelector('.t-icon').textContent = dark ? '☀️' : '🌙';
+      button.querySelector('.t-label').textContent = dark ? 'Light mode' : 'Dark mode';
+      button.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    }
+    button.addEventListener('click', function () {
+      root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+      label();
+    });
+    label();
+  }
+
+  function init() {
+    setupThemeToggle();
+    const tabs = document.querySelectorAll('[data-tab]');
+    for (let i = 0; i < tabs.length; i++) {
+      tabs[i].addEventListener('click', function (event) {
+        setTab(event.currentTarget.getAttribute('data-tab'));
+      });
+    }
+    setupCircuitEvents('halfCircuit');
+    setupCircuitEvents('fullCircuit');
+    setupCircuitEvents('rippleCircuit');
+    setupTableEvents('halfTable', function (m) {
+      state.half.A = bit(m, 1);
+      state.half.B = bit(m, 0);
+      renderHalf();
+    });
+    setupTableEvents('fullTable', function (m) {
+      state.full.A = bit(m, 2);
+      state.full.B = bit(m, 1);
+      state.full.Cin = bit(m, 0);
+      renderFull();
+    });
+
+    document.getElementById('numA').addEventListener('input', function (e) { setNumber('a', e.target.value); });
+    document.getElementById('numB').addEventListener('input', function (e) { setNumber('b', e.target.value); });
+    document.getElementById('randomPair').addEventListener('click', function () {
+      stopPlay();
+      state.ripple.a = randomInt(0, 15);
+      state.ripple.b = randomInt(0, 15);
+      state.ripple.step = 0;
+      renderRipple();
+    });
+    document.getElementById('stepReset').addEventListener('click', function () { stopPlay(); state.ripple.step = 0; renderRipple(); });
+    document.getElementById('stepNext').addEventListener('click', function () {
+      stopPlay();
+      if (state.ripple.step < 4) { state.ripple.step++; }
+      renderRipple();
+    });
+    document.getElementById('stepAll').addEventListener('click', function () { stopPlay(); state.ripple.step = 4; renderRipple(); });
+    document.getElementById('stepPlay').addEventListener('click', playRipple);
+
+    document.getElementById('newPractise').addEventListener('click', newPractise);
+    document.getElementById('allowOverflow').addEventListener('change', newPractise);
+    document.getElementById('practiseCheck').addEventListener('click', checkPractise);
+    document.getElementById('practiseReveal').addEventListener('click', revealPractise);
+    const ptable = document.getElementById('practiseTable');
+    ptable.addEventListener('click', function (event) {
+      const cell = event.target.closest('[data-cell]');
+      if (!cell) { return; }
+      const parts = cell.getAttribute('data-cell').split(',');
+      const current = state.practise[parts[0]][Number(parts[1])];
+      setPractiseCell(parts[0], Number(parts[1]), current === '' ? '0' : (current === '0' ? '1' : ''));
+    });
+    ptable.addEventListener('keydown', function (event) {
+      const cell = event.target.closest('[data-cell]');
+      if (!cell) { return; }
+      const parts = cell.getAttribute('data-cell').split(',');
+      if (event.key === '0' || event.key === '1') {
+        event.preventDefault();
+        setPractiseCell(parts[0], Number(parts[1]), event.key);
+      } else if (event.key === 'Backspace' || event.key === 'Delete') {
+        event.preventDefault();
+        setPractiseCell(parts[0], Number(parts[1]), '');
+      }
+    });
+    document.getElementById('practiseFeedback').addEventListener('click', function (event) {
+      if (event.target.closest('[data-action="next"]')) { newPractise(); }
+    });
+
+    renderHalf();
+    renderFull();
+    renderRipple();
+    newPractise();
+    setTab('half');
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
